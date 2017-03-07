@@ -24,9 +24,9 @@ class Config(object):
   hidden_size = 100
   max_epochs = 24 
   early_stopping = 2
-  dropout = 0.9
-  lr = 0.001
-  l2 = 0.001
+  dropout = 0.95
+  lr = 0.01
+  l2 = 0.0001
   window_size = 3
 
 class NERModel(LanguageModel):
@@ -37,6 +37,27 @@ class NERModel(LanguageModel):
   the standard Model method.
   """
 
+  def __init__(self, config):
+    """Constructs the network using the helper functions defined above."""
+    self.config = config
+    self.load_data(debug=True)
+    self.add_placeholders()
+    window = self.add_embedding()
+    y = self.add_model(window)
+
+    self.loss = self.add_loss_op(y)
+    self.predictions = tf.nn.softmax(y)
+    one_hot_prediction = tf.argmax(self.predictions, 1)
+    print('one_hot_prediction')
+    print(one_hot_prediction)
+    correct_prediction = tf.equal(
+        tf.argmax(self.labels_placeholder, 1), one_hot_prediction)
+    print(correct_prediction)
+    self.correct_predictions = tf.reduce_sum(tf.cast(correct_prediction, 'int32'))
+    print(self.correct_predictions)
+    self.train_op = self.add_training_op(self.loss)
+
+
   def load_data(self, debug=False):
     """Loads starter word-vectors and train/dev/test data."""
     # Load the starter word vectors
@@ -44,7 +65,7 @@ class NERModel(LanguageModel):
       'data/ner/vocab.txt', 'data/ner/wordVectors.txt')
     tagnames = ['O', 'LOC', 'MISC', 'ORG', 'PER']
     self.num_to_tag = dict(enumerate(tagnames))
-    tag_to_num = {v:k for k,v in self.num_to_tag.iteritems()}
+    tag_to_num = {v:k for k,v in self.num_to_tag.items()}
 
     # Load the training set
     docs = du.load_dataset('data/ner/train')
@@ -92,7 +113,12 @@ class NERModel(LanguageModel):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    self.input_placeholder = tf.placeholder(
+	    tf.int32, shape=(None,self.config.window_size), name='Input')
+    self.labels_placeholder = tf.placeholder(
+	    tf.float32, shape=(None, self.config.label_size), name='Target')
+    self.dropout_placeholder  = tf.placeholder(
+	    tf.float32, name='Dropout')
     ### END YOUR CODE
 
   def create_feed_dict(self, input_batch, dropout, label_batch=None):
@@ -117,7 +143,21 @@ class NERModel(LanguageModel):
       feed_dict: The feed dictionary mapping from placeholders to values.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+
+    feed_dict = {
+        self.input_placeholder: input_batch,
+    }
+    if label_batch is not None:
+      feed_dict[self.labels_placeholder] = label_batch
+    if dropout is not None:
+      feed_dict[self.dropout_placeholder] = dropout
+
+
+    # feed_dict = {self.input_placeholder : input_batch,}
+    # if label_batch is not None:
+    #     feed_dict[self.labels_placeholder] = label_batch
+    # if dropout is not None:
+    #     feed_dict[self.dropout_placeholder] = dropout
     ### END YOUR CODE
     return feed_dict
 
@@ -148,7 +188,11 @@ class NERModel(LanguageModel):
     # The embedding lookup is currently only implemented for the CPU
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      raise NotImplementedError
+      embedding = tf.get_variable('Embedding', [len(self.wv),
+                                                self.config.embed_size])
+      window = tf.nn.embedding_lookup(embedding, self.input_placeholder)
+      window = tf.reshape(window, [-1, self.config.window_size *
+                                   self.config.embed_size])
       ### END YOUR CODE
       return window
 
@@ -180,7 +224,28 @@ class NERModel(LanguageModel):
       output: tf.Tensor of shape (batch_size, label_size)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+
+    input_size = self.config.embed_size * self.config.window_size
+    label_size = self.config.label_size
+    hidden_size = self.config.hidden_size
+
+    with tf.variable_scope('Layer1', initializer=xavier_weight_init()) as \
+			scope:
+      W = tf.get_variable('W', [input_size, hidden_size])
+      b1 = tf.get_variable('b1', [hidden_size])
+      h = tf.nn.tanh(tf.matmul(window, W) + b1)
+      if self.config.l2:
+        tf.add_to_collection('total_loss',  0.5 * self.config.l2 *
+	                           tf.nn.l2_loss(W))
+    with tf.variable_scope('Layer2', initializer=xavier_weight_init()) as \
+            scope:
+        U = tf.get_variable('U', [hidden_size, label_size])
+        b2 = tf.get_variable('b2', [label_size])
+        y = tf.matmul(h, U) + b2
+        if self.config.l2:
+          tf.add_to_collection('total_loss', 0.5 * self.config.l2 *
+                               tf.nn.l2_loss(U))
+    output = tf.nn.dropout(y, self.dropout_placeholder)
     ### END YOUR CODE
     return output 
 
@@ -195,7 +260,16 @@ class NERModel(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    cross_entropy = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=y,
+                                                labels=self.labels_placeholder))
+    tf.add_to_collection('total_loss', cross_entropy)
+    loss = tf.add_n(tf.get_collection('total_loss'))
+
+    # cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+    #   y,  self.labels_placeholder))
+    # tf.add_to_collection('total_loss', cross_entropy)
+    # loss = tf.add_n(tf.get_collection('total_loss'))
     ### END YOUR CODE
     return loss
 
@@ -219,25 +293,12 @@ class NERModel(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    optimizer = tf.train.GradientDescentOptimizer(self.config.lr)
+    global_step = tf.Variable(0, name='global_step', trainable=False)
+    train_op = optimizer.minimize(loss, global_step=global_step)
     ### END YOUR CODE
     return train_op
 
-  def __init__(self, config):
-    """Constructs the network using the helper functions defined above."""
-    self.config = config
-    self.load_data(debug=False)
-    self.add_placeholders()
-    window = self.add_embedding()
-    y = self.add_model(window)
-
-    self.loss = self.add_loss_op(y)
-    self.predictions = tf.nn.softmax(y)
-    one_hot_prediction = tf.argmax(self.predictions, 1)
-    correct_prediction = tf.equal(
-        tf.argmax(self.labels_placeholder, 1), one_hot_prediction)
-    self.correct_predictions = tf.reduce_sum(tf.cast(correct_prediction, 'int32'))
-    self.train_op = self.add_training_op(self.loss)
 
   def run_epoch(self, session, input_data, input_labels,
                 shuffle=True, verbose=True):
@@ -300,17 +361,17 @@ def print_confusion(confusion, num_to_tag):
     total_guessed_tags = confusion.sum(axis=0)
     # Summing left to right gets the total number of true tags
     total_true_tags = confusion.sum(axis=1)
-    print
-    print confusion
+    print('confusion:')
+    print (confusion)
     for i, tag in sorted(num_to_tag.items()):
         prec = confusion[i, i] / float(total_guessed_tags[i])
         recall = confusion[i, i] / float(total_true_tags[i])
-        print 'Tag: {} - P {:2.4f} / R {:2.4f}'.format(tag, prec, recall)
+        print ('Tag: {} - P {:2.4f} / R {:2.4f}'.format(tag, prec, recall))
 
 def calculate_confusion(config, predicted_indices, y_indices):
     """Helper method that calculates confusion matrix."""
     confusion = np.zeros((config.label_size, config.label_size), dtype=np.int32)
-    for i in xrange(len(y_indices)):
+    for i in range(len(y_indices)):
         correct_label = y_indices[i]
         guessed_label = predicted_indices[i]
         confusion[correct_label, guessed_label] += 1
@@ -318,7 +379,7 @@ def calculate_confusion(config, predicted_indices, y_indices):
 
 def save_predictions(predictions, filename):
   """Saves predictions to provided file."""
-  with open(filename, "wb") as f:
+  with open(filename, "w") as f:
     for prediction in predictions:
       f.write(str(prediction) + "\n")
 
@@ -341,16 +402,16 @@ def test_NER():
       best_val_epoch = 0
 
       session.run(init)
-      for epoch in xrange(config.max_epochs):
-        print 'Epoch {}'.format(epoch)
+      for epoch in range(config.max_epochs):
+        print ('Epoch {}'.format(epoch))
         start = time.time()
         ###
         train_loss, train_acc = model.run_epoch(session, model.X_train,
                                                 model.y_train)
         val_loss, predictions = model.predict(session, model.X_dev, model.y_dev)
-        print 'Training loss: {}'.format(train_loss)
-        print 'Training acc: {}'.format(train_acc)
-        print 'Validation loss: {}'.format(val_loss)
+        print ('Training loss: {}'.format(train_loss))
+        print ('Training acc: {}'.format(train_acc))
+        print ('Validation loss: {}'.format(val_loss))
         if val_loss < best_val_loss:
           best_val_loss = val_loss
           best_val_epoch = epoch
@@ -363,12 +424,12 @@ def test_NER():
         ###
         confusion = calculate_confusion(config, predictions, model.y_dev)
         print_confusion(confusion, model.num_to_tag)
-        print 'Total time: {}'.format(time.time() - start)
+        print ('Total time: {}'.format(time.time() - start))
       
       saver.restore(session, './weights/ner.weights')
-      print 'Test'
-      print '=-=-='
-      print 'Writing predictions to q2_test.predicted'
+      print ('Test')
+      print ('=-=-=')
+      print ('Writing predictions to q2_test.predicted')
       _, predictions = model.predict(session, model.X_test, model.y_test)
       save_predictions(predictions, "q2_test.predicted")
 
