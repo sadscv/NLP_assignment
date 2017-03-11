@@ -21,7 +21,7 @@ class Config(object):
   # You may adjust the max_epochs to ensure convergence.
   max_epochs = 50
   # You may adjust this learning rate to ensure convergence.
-  lr = 1e-4 
+  lr = 1e-4
 
 class SoftmaxModel(Model):
   """Implements a Softmax classifier with cross-entropy loss."""

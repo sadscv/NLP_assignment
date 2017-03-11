@@ -8,7 +8,7 @@ import pandas as pd
 
 
 def invert_dict(d):
-    return {v:k for k,v in d.iteritems()}
+    return {v:k for k,v in d.items()}
 
 def flatten1(lst):
     return list(itertools.chain.from_iterable(lst))
@@ -81,7 +81,7 @@ def extract_word_set(docs):
     return words
 
 def pad_sequence(seq, left=1, right=1):
-    return left*[("<s>", "")] + seq + right*[("</s>", "")]
+    return int(left) * [("<s>", "")] + seq + int(right) * [("</s>", "")]
 
 ##
 # For window models
@@ -94,7 +94,7 @@ def seq_to_windows(words, tags, word_to_num, tag_to_num, left=1, right=1):
             continue # skip sentence delimiters
         tagn = tag_to_num[tags[i]]
         idxs = [word_to_num[words[ii]]
-                for ii in range(i - left, i + right + 1)]
+                for ii in range(int(i - left), int(i + right + 1))]
         X.append(idxs)
         y.append(tagn)
     return array(X), array(y)
@@ -107,6 +107,16 @@ def docs_to_windows(docs, word_to_num, tag_to_num, wsize=3):
     words = [canonicalize_word(w, word_to_num) for w in words]
     tags = [t.split("|")[0] for t in tags]
     return seq_to_windows(words, tags, word_to_num, tag_to_num, pad, pad)
+
+def docs_to_windows_for_test(docs, word_to_num, tag_to_num, wsize=3):
+    pad = (wsize - 1)/2
+    docs = flatten1([pad_sequence(seq, left=pad, right=pad) for seq in docs])
+
+    words, tags = zip(*docs)
+    words = [canonicalize_word(w, word_to_num) for w in words]
+    tags = [t.split("|")[0] for t in tags]
+    a, b = seq_to_windows(words, tags, word_to_num, tag_to_num, pad, pad)
+    return a, b, words
 
 def window_to_vec(window, L):
     """Concatenate word vectors for a given window."""

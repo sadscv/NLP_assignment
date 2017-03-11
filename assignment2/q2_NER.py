@@ -22,12 +22,12 @@ class Config(object):
   batch_size = 64
   label_size = 5
   hidden_size = 100
-  max_epochs = 24 
+  max_epochs = 40
   early_stopping = 2
-  dropout = 0.95
-  lr = 0.01
-  l2 = 0.0001
-  window_size = 3
+  dropout = 0.5
+  lr = 0.02
+  l2 = 0.0005
+  window_size = 5
 
 class NERModel(LanguageModel):
   """Implements a NER (Named Entity Recognition) model.
@@ -40,7 +40,7 @@ class NERModel(LanguageModel):
   def __init__(self, config):
     """Constructs the network using the helper functions defined above."""
     self.config = config
-    self.load_data(debug=True)
+    self.load_data(debug=False)
     self.add_placeholders()
     window = self.add_embedding()
     y = self.add_model(window)
