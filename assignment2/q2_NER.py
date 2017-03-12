@@ -186,7 +186,7 @@ class NERModel(LanguageModel):
       window: tf.Tensor of shape (-1, window_size*embed_size)
     """
     # The embedding lookup is currently only implemented for the CPU
-    with tf.device('/cpu:0'):
+    with tf.device('/gpu:0'):
       ### YOUR CODE HERE
       embedding = tf.get_variable('Embedding', [len(self.wv),
                                                 self.config.embed_size])

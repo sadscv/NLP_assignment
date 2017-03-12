@@ -404,12 +404,12 @@ def test_RNNLM():
                 break
             print('Total time: {}'.format(time.time() - start))
 
-        saver.restore(session, 'ptb_rnnlm.weights')
+        saver.restore(session, './ptb_rnnlm.weights')
         test_pp = model.run_epoch(session, model.encoded_test)
         print('=-=' * 5)
         print('Test perplexity: {}'.format(test_pp))
         print('=-=' * 5)
-        starting_text = 'in palo alto'
+        starting_text = 'whats the weather'
         while starting_text:
             print(' '.join(generate_sentence(
                 session, gen_model, gen_config, starting_text=starting_text,
