@@ -27,5 +27,5 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 " + sys.argv[0] + " wiki_data_path")
         exit()
-    word = sys.argv['1']
+    word = sys.argv[1]
     test(word)
