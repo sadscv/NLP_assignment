@@ -18,7 +18,7 @@ def test():
     word = False
     while not word:
         word = input('输入单词:').strip()
-        result = model.most_similar(s)
+        result = model.most_similar(word)
         for e in result:
             print(e[0], e[1])
         word = False
