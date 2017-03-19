@@ -12,20 +12,21 @@ def main():
     # how to load a model ?
     # model = word2vec.Word2Vec.load_word2vec_format("your_model.bin", binary=True)
 
-def test(word):
-
+def test():
+    s = '你好'
     model = gensim.models.KeyedVectors.load_word2vec_format('ch_wiki_200d.model.bin', binary=True)
-    result = model.most_similar(word)
-    for e in result:
-        print(e[0], e[1])
+    while (s = input('please enter')):
+        result = model.most_similar(s)
+        for e in result:
+            print(e[0], e[1])
     
 
 
 
 if __name__ == "__main__":
 #    main()
-    if len(sys.argv) != 2:
-        print("Usage: python3 " + sys.argv[0] + " wiki_data_path")
-        exit()
-    word = sys.argv[1]
-    test(word)
+#     if len(sys.argv) != 2:
+#         print("Usage: python3 " + sys.argv[0] + " wiki_data_path")
+#         exit()
+#     word = sys.argv[1]
+    test()
