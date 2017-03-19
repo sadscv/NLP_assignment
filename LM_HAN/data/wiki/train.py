@@ -15,10 +15,13 @@ def main():
 def test():
     s = '你好'
     model = gensim.models.KeyedVectors.load_word2vec_format('ch_wiki_200d.model.bin', binary=True)
-    while (s = input('please enter')):
+    word = False
+    while not word:
+        word = input('输入单词:').strip()
         result = model.most_similar(s)
         for e in result:
             print(e[0], e[1])
+        word = False
     
 
 
