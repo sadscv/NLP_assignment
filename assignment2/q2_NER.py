@@ -62,7 +62,7 @@ class NERModel(LanguageModel):
     """Loads starter word-vectors and train/dev/test data."""
     # Load the starter word vectors
     self.wv, word_to_num, num_to_word = ner.load_wv(
-      'data/ner/vocab.txt', 'data/ner/wordVectors.txt')
+      'data/ner/vocab', 'data/ner/wordVectors.txt')
     tagnames = ['O', 'LOC', 'MISC', 'ORG', 'PER']
     self.num_to_tag = dict(enumerate(tagnames))
     tag_to_num = {v:k for k,v in self.num_to_tag.items()}

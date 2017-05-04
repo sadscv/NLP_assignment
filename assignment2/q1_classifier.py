@@ -95,7 +95,7 @@ class SoftmaxModel(Model):
       feed_dict: The feed dictionary mapping from placeholders to values.
     """
     ### YOUR CODE HERE
-    feed_dict = {
+      = {
 	    self.input_placeholder : input_batch,
         self.labels_placeholder : label_batch,
                  }

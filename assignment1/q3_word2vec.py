@@ -87,7 +87,7 @@ def negSamplingCostAndGradient(predicted, target, outputVectors, dataset,
     grad = np.zeros(outputVectors.shape)
     gradPred = np.zeros(predicted.shape)
 
-#index存入所有U中的编号
+    #index存入所有U中的编号
     indices = [target]
     #循环Ｋ次，随机生成一个id,存入index.
     for k in range(K):

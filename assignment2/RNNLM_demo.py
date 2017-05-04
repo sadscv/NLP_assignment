@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Time    : 17-3-28 下午4:28
+# @Author  : sadscv
+# @File    : RNNLM_demo.py
+
 import sys
 import time
 
@@ -9,6 +15,7 @@ from utils import ptb_iterator, sample
 
 import tensorflow as tf
 
+from tensorflow.contrib import rnn
 from tensorflow.contrib.legacy_seq2seq import sequence_loss
 # from tensorflow.python.ops.seq2seq import sequence_loss
 from model import LanguageModel
@@ -32,6 +39,7 @@ class Config(object):
   early_stopping = 2
   dropout = 0.9
   lr = 0.001
+  lstm_size = 100
 
 
 class RNNLM_Model(LanguageModel):
@@ -57,30 +65,11 @@ class RNNLM_Model(LanguageModel):
 
     def add_placeholders(self):
         """Generate placeholder variables to represent the input tensors
-
             These placeholders are used as inputs by the rest of the model building
             code and will be fed data during training.  Note that when "None" is in a
             placeholder's shape, it's flexible
-
-            Adds following nodes to the computational graph.
-            (When None is in a placeholder's shape, it's flexible)
-
-            input_placeholder: Input placeholder tensor of shape
-                               (None, num_steps), type tf.int32
-            labels_placeholder: Labels placeholder tensor of shape
-                                (None, num_steps), type tf.float32
-            dropout_placeholder: Dropout value placeholder (scalar),
-                                 type tf.float32
-
-            Add these placeholders to self as the instance variables
-
-              self.input_placeholder
-              self.labels_placeholder
-              self.dropout_placeholder
-
-            (Don't change the variable names)
             """
-        ### YOUR CODE HERE
+
         self.input_placeholder = tf.placeholder(dtype=tf.int32,
                                                 shape=(None,
                                                        self.config.num_steps),
@@ -91,25 +80,9 @@ class RNNLM_Model(LanguageModel):
                                                  name='label')
         self.dropout_placeholder = tf.placeholder(dtype=tf.float32,
                                                   name='dropout')
-        ### END YOUR CODE
 
     def add_embedding(self):
-        """Add embedding layer.
-
-            Hint: This layer should use the input_placeholder to index into the
-                  embedding.
-            Hint: You might find tf.nn.embedding_lookup useful.
-            Hint: You might find tf.split, tf.squeeze useful in constructing tensor inputs
-            Hint: Check the last slide from the TensorFlow lecture.
-            Hint: Here are the dimensions of the variables you will need to create:
-
-              L: (len(self.vocab), embed_size)
-
-            Returns:
-              inputs: List of length num_steps, each of whose elements should be
-                      a tensor of shape (batch_size, embed_size).
-            """
-        # The embedding lookup is currently only implemented for the CPU
+        """Add embedding layer."""
         with tf.device('/gpu:0'):
             ### YOUR CODE HERE
             embedding = tf.get_variable('Embedding', [len(self.vocab),
@@ -128,16 +101,8 @@ class RNNLM_Model(LanguageModel):
 
     def add_projection(self, rnn_outputs):
         """Adds a projection layer.
-
         The projection layer transforms the hidden representation to a distribution
         over the vocabulary.
-
-        Hint: Here are the dimensions of the variables you will need to
-              create
-
-              U:   (hidden_size, len(vocab))
-              b_2: (len(vocab),)
-
         Args:
           rnn_outputs: List of length num_steps, each of whose elements should be
                        a tensor of shape (batch_size, embed_size).
@@ -145,12 +110,11 @@ class RNNLM_Model(LanguageModel):
           outputs: List of length num_steps, each a tensor of shape
                    (batch_size, len(vocab)
         """
-        ### YOUR CODE HERE
         U = tf.get_variable('U', [self.config.hidden_size, len(self.vocab)])
         b_2 = tf.get_variable('b_2', (len(self.vocab),))
         outputs = [tf.matmul(o, U) + b_2 for o in rnn_outputs]
 
-        ### END YOUR CODE
+
         return outputs
 
     def add_loss_op(self, output):
@@ -163,7 +127,6 @@ class RNNLM_Model(LanguageModel):
         Returns:
           loss: A 0-d tensor (scalar)
         """
-        ### YOUR CODE HERE
         all_ones = [tf.ones([self.config.num_steps * self.config.batch_size])]
         cross_entropy_loss = sequence_loss(logits=[output],
                                            targets=[tf.reshape(
@@ -174,64 +137,29 @@ class RNNLM_Model(LanguageModel):
         tf.add_to_collection('total_loss', cross_entropy_loss)
         loss = tf.add_n(tf.get_collection('total_loss'))
         # loss = tf.contrib.seq2seq.sequence_loss()
-        ### END YOUR CODE
         return loss
 
     def add_training_op(self, loss):
         """Sets up the training Ops.
-
-        Creates an optimizer and applies the gradients to all trainable variables.
-        The Op returned by this function is what must be passed to the
-        `sess.run()` call to cause the model to train. See
-
-        https://www.tensorflow.org/versions/r0.7/api_docs/python/train.html#Optimizer
-
-        for more information.
-
-        Hint: Use tf.train.AdamOptimizer for this model.
-              Calling optimizer.minimize() will return a train_op object.
-
         Args:
           loss: Loss tensor, from cross_entropy_loss.
         Returns:
           train_op: The Op for training.
         """
-        ### YOUR CODE HERE
         with tf.variable_scope(tf.get_variable_scope()) as vscope:
             optimzer = tf.train.AdamOptimizer(self.config.lr)
             # optimzer.minimize函数功能：
             # 计算loss对各个变量（tf.variables)的梯度， 并更新参数
             train_op = optimzer.minimize(loss)
             tf.get_variable_scope().reuse_variables()
-            ### END YOUR CODE
         return train_op
 
     def add_model(self, inputs):
         """Creates the RNN LM model.
 
         In the space provided below, you need to implement the equations for the
-        RNN LM model. Note that you may NOT use built in rnn_cell functions from
+        RNNLM model. Note that you may NOT use built in rnn_cell functions from
         tensorflow.
-
-        Hint: Use a zeros tensor of shape (batch_size, hidden_size) as
-              initial state for the RNN. Add this to self as instance variable
-
-              self.initial_state
-
-              (Don't change variable name)
-        Hint: Add the last RNN output to self as instance variable
-
-              self.final_state
-
-              (Don't change variable name)
-        Hint: Make sure to apply dropout to the inputs and the outputs.
-        Hint: Use a variable scope (e.g. "RNN") to define RNN variables.
-        Hint: Perform an explicit for-loop over inputs. You can use
-              scope.reuse_variables() to ensure that the weights used at each
-              iteration (each time-step) are the same. (Make sure you don't call
-              this for iteration 0 though or nothing will be initialized!)
-        Hint: Here are the dimensions of the various variables you will need to
-              create:
 
               H: (hidden_size, hidden_size)
               I: (embed_size, hidden_size)
@@ -244,7 +172,6 @@ class RNNLM_Model(LanguageModel):
           outputs: List of length num_steps, each of whose elements should be
                    a tensor of shape (batch_size, hidden_size)
         """
-        ### YOUR CODE HERE
         with tf.variable_scope('InputDropout'):
             inputs = [tf.nn.dropout(x, self.dropout_placeholder) for x in
                       inputs]
@@ -272,16 +199,50 @@ class RNNLM_Model(LanguageModel):
         with tf.variable_scope('RNN_dropout'):
             rnn_outputs = [tf.nn.dropout(x, self.dropout_placeholder) for x in
                            rnn_outputs]
-        ### END YOUR CODE
         return rnn_outputs
 
+    def add_model_RNN(self, inputs):
+        self.initial_state = tf.zeros([self.config.batch_size,
+                                       self.config.hidden_size])
+        lstm_cell = rnn.BasicRNNCell(self.config.lstm_size)
+        cell = rnn.DropoutWrapper(lstm_cell, output_keep_prob=self.config.dropout)
+        self._initial_state = cell.zero_state(batch_size=self.config.batch_size, dtype=tf.float32)
+        state = self._initial_state
+        rnn_outputs = []
+        with tf.variable_scope('RNN') as scope:
+            for tstep, current_input in enumerate(inputs):
+                if tstep > 0:
+                    scope.reuse_variables()
+                output, state = cell(current_input, state)
+                rnn_outputs.append(state)
+            self.final_state = rnn_outputs[-1]
+
+        return rnn_outputs
+
+    def add_model_LSTM(self, inputs):
+        self.initial_state = tf.zeros([self.config.batch_size,
+                                       self.config.hidden_size])
+        lstm_cell = rnn.BasicLSTMCell(self.config.lstm_size)
+        cell = rnn.DropoutWrapper(lstm_cell, output_keep_prob=self.config.dropout)
+        self._initial_state = cell.zero_state(batch_size=self.config.batch_size, dtype=tf.float32)
+        state = self._initial_state
+        rnn_outputs = []
+        with tf.variable_scope('RNN') as scope:
+            for tstep, current_input in enumerate(inputs):
+                if tstep > 0:
+                    scope.reuse_variables()
+                output, state = cell(current_input, state)
+                rnn_outputs.append(state)
+            self.final_state = rnn_outputs[-1]
+
+        return rnn_outputs
 
     def __init__(self, config):
         self.config = config
         self.load_data(debug=False)
         self.add_placeholders()
         self.inputs = self.add_embedding()
-        self.rnn_outputs = self.add_model(self.inputs)
+        self.rnn_outputs = self.add_model_RNN(self.inputs)
         self.outputs = self.add_projection(self.rnn_outputs)
 
         # We want to check how well we correctly predict the next word
@@ -326,6 +287,8 @@ class RNNLM_Model(LanguageModel):
             sys.stdout.write('\r')
         return np.exp(np.mean(total_loss))
 
+
+
 def generate_text(session, model, config, starting_text='<eos>',
                   stop_length=100, stop_tokens=None, temp=1.0):
     """Generate text from the model.
@@ -350,7 +313,6 @@ def generate_text(session, model, config, starting_text='<eos>',
     # Imagine tokens as a batch size of one, length of len(tokens[0])
     tokens = [model.vocab.encode(word) for word in starting_text.split()]
     for i in range(stop_length):
-        ### YOUR CODE HERE
         feed = {
             model.input_placeholder: [tokens[-1:]],
             model.initial_state: state,
@@ -359,7 +321,6 @@ def generate_text(session, model, config, starting_text='<eos>',
         state, y_pred = session.run(
             [model.final_state, model.predictions[-1]], feed_dict=feed
         )
-        ### END YOUR CODE
         next_word_idx = sample(y_pred[0], temperature=temp)
         tokens.append(next_word_idx)
         if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
@@ -376,7 +337,7 @@ def generate_sentence(session, model, config, *args, **kwargs):
 def test_RNNLM():
     config = Config()
     gen_config = deepcopy(config)
-    gen_config.batch_size = gen_config.num_steps = 10
+    gen_config.batch_size = gen_config.num_steps = 1
 
     # We create the training model and generative model
     with tf.variable_scope('RNNLM') as scope:
