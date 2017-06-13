@@ -332,7 +332,7 @@ class RNNLM_Model(LanguageModel):
             rnn_outputs_columns = rnn_outputs[1::2]
             outputs_r = [tf.matmul(i, U_r)+b_2_r for i in rnn_outputs_rows]
             outputs_c = [tf.matmul(j, U_c)+b_2_c for j in rnn_outputs_columns]
-            #此时output_r,c,都是一个list,第个元素为(batch_size,matrix_length)，代表batch个预测和每个预测对应行/列的可能性。
+            #此时output_r,c,都是一个list,每个元素为(batch_size,matrix_length)，代表batch个预测和每个预测对应行/列的可能性。
             return outputs_r, outputs_c
             # outputs = []
             # for i in range(len(rnn_outputs)/2):

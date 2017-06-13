@@ -29,6 +29,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics.pairwise import pairwise_distances
+import embedding_ops_modified as test
 
 # Set random seeds
 SEED = 2016
@@ -213,7 +214,8 @@ class Word2Vec(BaseEstimator, TransformerMixin):
             # Model.
             # Look up embeddings for inputs.
             if self.architecture == 'skip-gram':
-                self.embed = tf.nn.embedding_lookup(self.embeddings, self.train_dataset)
+                # self.embed = tf.nn.embedding_lookup(self.embeddings, self.train_dataset)
+                self.embed = test.embedding_lookup(self.embeddings, self.train_dataset)
             elif self.architecture == 'cbow':
                 embed = tf.zeros([self.batch_size, self.embedding_size])
                 for j in range(self.num_skips):
